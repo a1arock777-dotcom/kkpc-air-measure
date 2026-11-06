@@ -315,7 +315,7 @@ function vRep(v){
  if(DRAFT)c.appendChild(draftView());
  v.appendChild(c);
  var l=el('div',{class:'card'},[el('b',null,'저장된 성적서 '+Object.keys(S.reports).length+'건')]);
- Object.keys(S.reports).sort().forEach(function(k){var r=S.reports[k];l.appendChild(el('div',{class:'muted'},r.date+'  '+r.outlet+'  '+r.issue+'  ('+(r.rows||[]).length+'항목)'))});
+ Object.keys(S.reports).sort().forEach(function(k){var r=S.reports[k];l.appendChild(el('div',{class:'muted'},r.date+'  '+r.outlet+'  '+r.issue+'  ('+(r.rows||[]).length+'항목)'+(r.purpose==='참고'?' (참고용)':'')))});
  v.appendChild(l)}
 async function readPdf(file){
  status('PDF를 읽는 중…');
@@ -373,7 +373,7 @@ function vQuery(v){
  var c=el('div',{class:'card'},[el('b',null,'배출구별 측정값 조회'),el('div',{class:'row',style:'margin:8px 0'},[so,si])]);
  var t=el('table');t.appendChild(el('tr',null,['채취일','항목','측정값','허용기준','단위'].map(function(h){return el('th',null,h)})));
  var n=0;Object.keys(S.reports).map(function(k){return S.reports[k]}).filter(function(r){return r.outlet===QO}).sort(function(a,b){return a.date<b.date?1:-1}).forEach(function(r){
-  (r.rows||[]).filter(function(x){return !QI||x.item===QI}).forEach(function(x){n++;t.appendChild(el('tr',null,[r.date,x.item,x.value,x.limit,x.unit].map(function(z){return el('td',null,String(z))})))})});
+  (r.rows||[]).filter(function(x){return !QI||x.item===QI}).forEach(function(x){n++;t.appendChild(el('tr',null,[r.date,x.item+(r.purpose==='참고'?' (참고용)':''),x.value,x.limit,x.unit].map(function(z){return el('td',null,String(z))})))})});
  c.appendChild(el('div',{class:'scroll'},t));
  if(!n)c.appendChild(el('div',{class:'muted'},'저장된 성적서가 없습니다. 성적서 탭에서 PDF를 올려 보세요.'));
  v.appendChild(c)}
