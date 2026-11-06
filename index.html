@@ -79,6 +79,7 @@ function noteFor(k,o,n,c){
  var msg=[];if(!P.outlets[o])return '허가서에 없는 배출구 번호';
  var it=pit(o,n);if(!it)return '허가서에 없는 항목('+n+')';
  if(c==='측정면제')return '측정면제 항목입니다';
+ if(n==='THC'&&{'A-109':1,'A-110':1,'A-154':1,'A-155':1}[o])return '허가서상 '+c+', 생기팀 요청으로 월1회 측정중';
  if(it.m)return it.m;
  var p=prange(k,c);if(!p)return '';var y=+k.slice(0,4);
  if(y===P.year&&c!=='월2회'){var ms=it.d.filter(function(m){return m>=p[0]&&m<=p[1]});
@@ -330,8 +331,8 @@ async function readPdf(file){
  render()}
 function mergeSplit(lines){
  /* 표 칸이 위아래로 갈라진 항목: 윗줄에 "값 종료시각 방법"만, 아랫줄에 "항목 기준 시작시각 ~"만 있는 경우를 한 줄로 합친다 */
- var inc=/^\s*([가-힣A-Za-z0-9,\.\(\)\- ]+?)\s+(\d+(?:\.\d+)?)\s*(㎎\/s㎥|ppm|ng\S*)\s+(\d{2}:\d{2})\s*~\s*$/;
- var orp=/^\s*(?:[가-힣]\s+)?(불검출|\d+(?:\.\d+)?)\s*(?:㎎\/s㎥|ppm|ng\S*)?\s+(\d{2}:\d{2})\s+ES/;
+ var inc=/^\s*([가-힣A-Za-z0-9,\.\(\)\- ]+?)\s+(\d+(?:\.\d+)?)\s*(㎎\/s㎥|ppm|ng\S*)\s+(\d{1,2}:\d{2})\s*~\s*$/;
+ var orp=/^\s*(?:[가-힣]\s+)?(불검출|\d+(?:\.\d+)?)\s*(?:㎎\/s㎥|ppm|ng\S*)?\s+(\d{1,2}:\d{2})\s+ES/;
  var out=[];
  for(var i=0;i<lines.length;i++){var a=lines[i].match(inc),b=i>0?lines[i-1].match(orp):null;
   if(a&&b&&out.length&&out[out.length-1]===lines[i-1]){out.pop();out.push(a[1]+' '+a[2]+' '+a[3]+' '+b[1]+' '+a[4]+' ~ '+b[2])}
@@ -343,7 +344,7 @@ function parseReport(lines,fn){
  var a=txt.match(/발급번호\s*:\s*([A-Z0-9\-]+)/);r.issue=a?a[1]:'';
  var b=txt.match(/\[\s*(A-\d+)\s*\]/);r.outlet=b?b[1]:(fn.match(/A-\d+/)||[''])[0];
  var d=txt.match(/채취\s*일\s*:\s*(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);r.date=d?d[1]+'-'+pad(+d[2])+'-'+pad(+d[3]):'';
- var re=/([가-힣A-Za-z0-9,\.\(\)\- ]+?)\s+(\d+(?:\.\d+)?)\s*(㎎\/s㎥|ppm|ng\S*)\s+(불검출|\d+(?:\.\d+)?)\s*(?:㎎\/s㎥|ppm|ng\S*)?\s+(\d{2}:\d{2})\s*~\s*(\d{2}:\d{2})/;
+ var re=/([가-힣A-Za-z0-9,\.\(\)\- ]+?)\s+(\d+(?:\.\d+)?)\s*(㎎\/s㎥|ppm|ng\S*)\s+(불검출|\d+(?:\.\d+)?)\s*(?:㎎\/s㎥|ppm|ng\S*)?\s+(\d{1,2}:\d{2})\s*~\s*(\d{1,2}:\d{2})/;
  lines.forEach(function(ln){var m=ln.match(re);if(!m)return;
   var name=m[1].trim().split(' ');while(name.length>1&&name[0].length<=1)name.shift();
   r.rows.push({item:name.join(' '),limit:+m[2],unit:m[3],value:m[4],time:m[5]+'~'+m[6]})});
