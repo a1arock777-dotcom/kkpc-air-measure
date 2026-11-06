@@ -49,6 +49,7 @@ td input{width:90px}
 <input id="lp" type="password" placeholder="비밀번호" autocomplete="current-password" required>
 <button class="pri" type="submit">로그인</button>
 <div id="lm" class="muted" style="color:var(--wn)"></div>
+<a href="#" id="lr" class="muted">비밀번호 설정·변경: 이메일 입력 후 여기를 누르면 재설정 메일이 갑니다</a>
 </form></div></div>
 <header>
 <h1>대기측정 관리 <span class="muted">금호석유화학 울산수지공장 × 미래숲</span></h1>
@@ -374,7 +375,7 @@ function vQuery(v){
 </script>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,sendPasswordResetEmail,signOut} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 import {initializeFirestore,collection,doc,setDoc,deleteDoc,getDoc,onSnapshot} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 var app=initializeApp({apiKey:"AIzaSyC2rXMuufImZCZq6N89GwTlPg_Xgse4jEU",authDomain:"kkpc-air-measure.firebaseapp.com",projectId:"kkpc-air-measure",storageBucket:"kkpc-air-measure.firebasestorage.app",messagingSenderId:"346985691005",appId:"1:346985691005:web:c4401fbf0611ecd7e57e14"});
 var auth=getAuth(app),fs=initializeFirestore(app,{ignoreUndefinedProperties:true});
@@ -384,6 +385,9 @@ var L=function(id){return document.getElementById(id)};
 function msg(t){L('lm').textContent=t||''}
 L('lf').addEventListener('submit',function(e){e.preventDefault();msg('로그인 중...');
  signInWithEmailAndPassword(auth,L('le').value.trim(),L('lp').value).catch(function(){msg('이메일 또는 비밀번호가 맞지 않습니다.')})});
+L('lr').addEventListener('click',function(e){e.preventDefault();var em=L('le').value.trim();
+ if(!em){msg('위 이메일 칸에 이메일을 입력한 뒤 다시 눌러 주세요.');return}
+ sendPasswordResetEmail(auth,em).then(function(){msg('해당 이메일로 가입된 계정이 있으면 재설정 메일이 발송됩니다. 메일함(스팸함 포함)을 확인하세요.')}).catch(function(){msg('메일을 보내지 못했습니다. 이메일 주소를 확인하세요.')})});
 var started=false;
 onAuthStateChanged(auth,async function(u){
  if(!u){L('login').style.display='flex';return}
