@@ -35,7 +35,8 @@ td input{width:90px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .bad{color:var(--wn);background:var(--wnbg);padding:2px 6px;border-radius:4px;font-size:12px}
 tr.yel td{background:#fff3a3 !important}
-tr.blu td{background:#cfe8ff !important}
+tr.blu td{background:#cfe8ff !important;color:#1f1e1b !important}
+.tag.dn{background:#a9dcf7;color:#0a3a5c;font-weight:600}
 .good{color:var(--ok);background:var(--okbg);padding:2px 6px;border-radius:4px;font-size:12px}
 .nt{color:var(--wn);font-size:12px}.ok2{color:var(--tx2);font-size:12px}.tag small{opacity:.8}
 @media (max-width:600px){.cal .d{min-height:56px;font-size:11px}.tag{font-size:10px}}
@@ -75,6 +76,12 @@ function pit(o,n){var O=P.outlets[o];if(!O)return null;for(var i=0;i<O.items.len
 function cyc(x,n){return (x.cy&&x.cy[n])||(pit(x.o,n)?pit(x.o,n).c:'')}
 function prange(k,c){var m=+k.slice(5,7);if(c==='연1회')return [1,12];if(c==='반기1회')return m<=6?[1,6]:[7,12];
  if(c==='분기1회'){var s=Math.floor((m-1)/3)*3+1;return [s,s+2]}if(c==='월2회')return [m,m];return null}
+function rn(s){s=String(s).replace(/\(참고용\)/g,'').replace(/\s+/g,'');var u=s.toUpperCase();
+ if(/THC|탄화수소/.test(u))return 'THC';if(u==='SOX'||s==='황산화물')return 'SOx';if(u==='NOX'||s==='질소산화물')return 'NOx';if(u==='CO'||s==='일산화탄소')return 'CO';if(s==='스티렌')return '스틸렌';return s}
+var DONE=null,DONEN=-1;
+function doneSet(){var n=Object.keys(S.reports).length;if(DONE&&DONEN===n)return DONE;DONE={};DONEN=n;
+ Object.keys(S.reports).forEach(function(k){var r=S.reports[k];if(!r||!r.date)return;(r.rows||[]).forEach(function(x){DONE[r.date+'|'+r.outlet+'|'+rn(x.item)]=1})});return DONE}
+function isDone(k,o,n){return !!doneSet()[k+'|'+o+'|'+rn(n)]}
 function noteFor(k,o,n,c){
  var msg=[];if(!P.outlets[o])return '허가서에 없는 배출구 번호';
  var it=pit(o,n);if(!it)return '허가서에 없는 항목('+n+')';
@@ -136,7 +143,7 @@ function vSched(v){
  for(var d=1;d<=last;d++){(function(d){
   var k=key(y,m,d),it=(S.sched[k]&&S.sched[k].items)||[];
   var cell=el('div',{class:'d'+(sel===k?' sel':''),onclick:function(){sel=k;render()}},[el('b',null,d)]);
-  it.slice(0,3).forEach(function(x){cell.appendChild(el('span',{class:'tag'},x.o+' '+x.it.map(function(n){n=norm(n);var c=cyc(x,n);return n+(c?'('+SHORT[c]+')':'')}).join('·')))});
+  it.slice(0,3).forEach(function(x){var all=x.it.every(function(n){return isDone(k,x.o,n)});cell.appendChild(el('span',{class:'tag'+(all?' dn':'')},(all?'✓ ':'')+x.o+' '+x.it.map(function(n){n=norm(n);var c=cyc(x,n);return n+(c?'('+SHORT[c]+')':'')}).join('·')))});
   if(it.length>3)cell.appendChild(el('span',{class:'tag'},'+'+(it.length-3)));
   g.appendChild(cell)})(d)}
  c.appendChild(g);v.appendChild(c);
@@ -147,13 +154,14 @@ function vSched(v){
  v.appendChild(logPanel());
 }
 function monthTable(y,m){
- var c=el('div',{class:'card'},[el('b',null,(m+1)+'월 측정 일정 목록'),el('div',{class:'muted'},'이미 측정했거나 같은 기간에 일정이 또 있으면 비고에 안내됩니다. (등록은 막지 않습니다)')]);
+ var c=el('div',{class:'card'},[el('b',null,(m+1)+'월 측정 일정 목록'),el('div',{class:'muted'},'이미 측정했거나 같은 기간에 일정이 또 있으면 비고에 안내됩니다. (등록은 막지 않습니다)'),el('div',{style:'margin:6px 0;font-size:13px'},[el('span',{style:'background:#cfe8ff;color:#1f1e1b;padding:2px 8px;border-radius:4px'},'하늘색 = 측정 완료(그날 성적서가 저장된 항목)')])]);
  var rows=flat(y+'-'+pad(m+1));var t=el('table');
  t.appendChild(el('tr',null,['날짜','배출구','항목','주기','비고'].map(function(h){return el('th',null,h)})));
  var WD=['일','월','화','수','목','금','토'];
  rows.forEach(function(r){var dt=new Date(+r.k.slice(0,4),+r.k.slice(5,7)-1,+r.k.slice(8,10));
   var nt=noteFor(r.k,r.o,r.n,r.c);
-  t.appendChild(el('tr',null,[el('td',null,(+r.k.slice(5,7))+'/'+(+r.k.slice(8,10))+'('+WD[dt.getDay()]+')'),el('td',null,r.o),el('td',null,r.n),el('td',null,r.c||'-'),el('td',{class:nt?'nt':'ok2'},nt||(r.note||''))]))});
+  var dn=isDone(r.k,r.o,r.n);
+  t.appendChild(el('tr',{class:dn?'blu':''},[el('td',null,(+r.k.slice(5,7))+'/'+(+r.k.slice(8,10))+'('+WD[dt.getDay()]+')'),el('td',null,r.o),el('td',null,r.n),el('td',null,r.c||'-'),el('td',{class:nt?'nt':'ok2'},(dn?'✓ 측정 완료 ':'')+(nt||(r.note||'')))]))});
  if(!rows.length)c.appendChild(el('div',{class:'muted'},'이 달에 등록된 일정이 없습니다.'));
  c.appendChild(el('div',{class:'scroll'},t));return c}
 function cloneItems(a){return a.map(function(x){return {o:x.o,it:x.it.map(norm),cy:Object.assign({},x.cy||{}),note:x.note||''}})}
@@ -387,19 +395,19 @@ function draftView(){
   var o={date:D.date,outlet:D.outlet,issue:D.issue,rows:D.rows,file:D.file};S.reports[id]=o;save('reports',id,o);DRAFT=null;status('저장했습니다');render()}},'확인 후 저장'));
  return w}
 /* 조회 */
-var QO='',QI='';
+var QO='',QI='',QF='',QT='';
 function vQuery(v){
  var outs={},items={};Object.keys(S.reports).forEach(function(k){var r=S.reports[k];outs[r.outlet]=1;(r.rows||[]).forEach(function(x){items[x.item]=1})});
  var os=Object.keys(outs).sort(),is=Object.keys(items).sort();
  if(!QO&&os.length)QO=os[0];
  var so=el('select',{onchange:function(){QO=this.value;render()}},os.map(function(x){var o=el('option',{value:x},x);if(x===QO)o.selected=true;return o}));
  var si=el('select',{onchange:function(){QI=this.value;render()}},[el('option',{value:''},'전체 항목')].concat(is.map(function(x){var o=el('option',{value:x},x);if(x===QI)o.selected=true;return o})));
- var c=el('div',{class:'card'},[el('b',null,'배출구별 측정값 조회'),el('div',{class:'row',style:'margin:8px 0'},[so,si])]);
+ var c=el('div',{class:'card'},[el('b',null,'배출구별 측정값 조회'),el('div',{class:'row',style:'margin:8px 0'},[so,si]),el('div',{class:'row',style:'margin:8px 0'},[el('span',{class:'muted'},'조회기간'),el('input',{type:'date',value:QF,onchange:function(){QF=this.value;render()}}),el('span',null,'~'),el('input',{type:'date',value:QT,onchange:function(){QT=this.value;render()}}),el('button',{onclick:function(){QF='';QT='';render()}},'전체 기간')])]);
  var t=el('table');t.appendChild(el('tr',null,['채취일','항목','측정값','허용기준','단위'].map(function(h){return el('th',null,h)})));
- var n=0;Object.keys(S.reports).map(function(k){return S.reports[k]}).filter(function(r){return r.outlet===QO}).sort(function(a,b){return a.date<b.date?1:-1}).forEach(function(r){
+ var n=0;Object.keys(S.reports).map(function(k){return S.reports[k]}).filter(function(r){return r.outlet===QO&&(!QF||r.date>=QF)&&(!QT||r.date<=QT)}).sort(function(a,b){return a.date<b.date?1:-1}).forEach(function(r){
   (r.rows||[]).filter(function(x){return !QI||x.item===QI}).forEach(function(x){n++;t.appendChild(el('tr',null,[r.date,x.item+(r.purpose==='참고'?' (참고용)':''),x.value,x.limit,x.unit].map(function(z){return el('td',null,String(z))})))})});
  c.appendChild(el('div',{class:'scroll'},t));
- if(!n)c.appendChild(el('div',{class:'muted'},'저장된 성적서가 없습니다. 성적서 탭에서 PDF를 올려 보세요.'));
+ if(!n)c.appendChild(el('div',{class:'muted'},'조건에 맞는 성적서가 없습니다. 조회기간·항목을 확인하세요.'));
  v.appendChild(c)}
 </script>
 <script type="module">
