@@ -417,6 +417,8 @@ function rk(s){s=rn(s);if(/^크롬/.test(s))return '크롬';if(/^비소/.test(s)
  if(/프로필렌옥사이드|산화프로플렌|^PO$/.test(s))return 'PO';if(/에틸렌옥사이드|산화에틸렌|^EO$/.test(s))return 'EO';return s}
 var RMALL=false,RMQ='';
 function outNo(k){return +String(k).replace(/\D/g,'')}
+function rmNorm(x){return String(x).toLowerCase().replace(/[\s\-_]/g,'')}
+function rmMatch(r){var q=rmNorm(RMQ);if(!q)return true;if(/^a?\d+$/.test(q)){var nq=q.charAt(0)==='a'?q:'a'+q;return rmNorm(r.o)===nq}return rmNorm(r.o+' '+r.desc+' '+r.n+' '+r.ab).indexOf(q)>=0}
 function vRemain(v){
  var Y=P.year||2026,now=new Date(),today=key(now.getFullYear(),now.getMonth(),now.getDate());
  var done={},sch={};
@@ -434,7 +436,7 @@ function vRemain(v){
     if(un.length){var p=un[0],last=new Date(Y,p[1],0);dl=key(Y,p[1]-1,last.getDate());over=dl<today}}
    var noteTxt=(it.n==='THC'&&{'A-109':1,'A-110':1,'A-154':1,'A-155':1}[o])?'생기팀 요청 월1회 측정중':'';
    rows.push({o:o,desc:O.desc,ab:ABT[o]||'',n:it.n,c:it.c,cnt:cnt,req:req,ds:ds,left:left,dl:dl,over:over,sc:Object.keys(sch[kk]||{}).sort(),note:noteTxt})})});
- var shown=rows.filter(function(r){return (RMALL||r.left>0)&&(!RMQ||(r.o+' '+r.desc+' '+r.n).toLowerCase().indexOf(RMQ.toLowerCase())>=0)});
+ var shown=rows.filter(function(r){return (RMALL||r.left>0)&&rmMatch(r)});
  var nLeft=rows.filter(function(r){return r.left>0}).length,nOver=rows.filter(function(r){return r.left>0&&r.over}).length;
  var c=el('div',{class:'card'},[el('b',null,Y+'년 잔여측정 현황'),
   el('div',{class:'muted',style:'margin:6px 0'},'기준일 '+today+' · 전체 '+rows.length+'건 중 잔여 '+nLeft+'건 (기한 경과 '+nOver+'건) · 측정면제 항목 제외 · 성적서에 저장된 측정일 기준'),
