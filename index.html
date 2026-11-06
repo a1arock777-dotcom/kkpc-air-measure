@@ -125,7 +125,7 @@ function vSched(v){
   el('button',{onclick:function(){ym=new Date(y,m-1,1);render()}},'◀'),
   el('b',null,y+'년 '+(m+1)+'월'),
   el('button',{onclick:function(){ym=new Date(y,m+1,1);render()}},'▶')]);
- var c=el('div',{class:'card'},[head]);
+ var c=el('div',{class:'card'},[head,el('div',{class:'muted',style:'margin-bottom:6px'},role==='미래숲'?'날짜 칸을 누르면 아래에 그날의 일정 목록과 "수기 입력" 창이 열립니다. 엑셀로 한 번에 올릴 수도 있습니다.':'날짜 칸을 누르면 아래에 그날의 측정 일정이 표시됩니다.')]);
  var g=el('div',{class:'cal'});
  ['일','월','화','수','목','금','토'].forEach(function(d){g.appendChild(el('div',{class:'hd'},d))});
  var first=new Date(y,m,1).getDay(),last=new Date(y,m+1,0).getDate();
