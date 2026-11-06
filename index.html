@@ -34,6 +34,8 @@ td input{width:90px}
 .scroll{overflow-x:auto}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .bad{color:var(--wn);background:var(--wnbg);padding:2px 6px;border-radius:4px;font-size:12px}
+tr.yel td{background:#fff3a3 !important}
+tr.blu td{background:#cfe8ff !important}
 .good{color:var(--ok);background:var(--okbg);padding:2px 6px;border-radius:4px;font-size:12px}
 .nt{color:var(--wn);font-size:12px}.ok2{color:var(--tx2);font-size:12px}.tag small{opacity:.8}
 @media (max-width:600px){.cal .d{min-height:56px;font-size:11px}.tag{font-size:10px}}
@@ -270,11 +272,13 @@ function kindOf(o){var O=P.outlets[o];if(!O)return '';if(/^(RTO|VCU)/.test(O.des
 function fuelRows(){var m={};Object.keys(S.sched).sort().forEach(function(k){(S.sched[k].items||[]).forEach(function(x){var id=k+'_'+x.o;
  if(!m[id])m[id]={id:id,k:k,o:x.o,it:[]};x.it.map(norm).forEach(function(n){if(m[id].it.indexOf(n)<0)m[id].it.push(n)})})});
  return Object.keys(m).sort().map(function(i){return m[i]})}
+function TODAY(){var d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
 function vFuel(v){
  var can=role==='금호';
  if(!can)v.appendChild(el('div',{class:'card',style:'background:var(--wnbg);color:var(--wn)'},[el('b',null,ME.admin?'지금은 "미래숲 보기"라서 입력 칸이 잠겨 있습니다. ':'연료사용량 입력은 금호(관리자)만 가능합니다. '),ME.admin?el('button',{class:'pri',onclick:function(){role='금호';render()}},'금호 보기로 바꾸기'):''
 ]));
  var c=el('div',{class:'card'},[el('b',null,'연료사용량 등 data 요청'),el('div',{class:'muted'},'측정일정이 등록되면 요청 행이 배출구별로 자동 생성됩니다(같은 날 같은 배출구는 한 줄). 입력은 금호만 가능하고 미래숲은 조회·복사만 합니다. 시간당 연료사용량 = 일 LNG ÷ 24, 시간당 제품생산량 = 일 생산량 ÷ 24 로 자동 계산됩니다.'),
+  el('div',{style:'margin:6px 0;font-size:13px'},[el('span',{style:'background:#fff3a3;padding:2px 8px;border-radius:4px;margin-right:6px'},'노란색 = 지금 입력할 수 있는 줄(측정일 다음날부터)'),el('span',{style:'background:#cfe8ff;padding:2px 8px;border-radius:4px'},'하늘색 = 입력 완료')]),
   el('div',{class:'muted'},'일 LNG(㎥)는 RTO·VCU·보일러만 입력하고 나머지 배출구는 0으로 자동 처리됩니다. 일 생산량(톤)은 각 생산공정 일보 값을 입력하세요.')]);
  var rows=fuelRows();var t=el('table');
  t.appendChild(el('tr',null,['측정일','배출구','부서','측정항목','종류','일 LNG(㎥)','일 생산량(톤)','시간당 연료사용량(㎥/h)','시간당 제품생산량(톤/h)','소각량','원료투입량','상태'].map(function(h){return el('th',null,h)})));
@@ -283,15 +287,15 @@ function vFuel(v){
   var f=S.fuel[r.id]||{},isF=!!FUELO[r.o];
   var Li=el('input',{type:'number',value:isF?(f.L==null?'':f.L):0}),Mi=el('input',{type:'number',value:f.M==null?'':f.M});
   if(!can||!isF)Li.disabled=true;if(!can)Mi.disabled=true;
-  var E=el('td'),F=el('td'),st=el('td');
+  var E=el('td'),F=el('td'),st=el('td'),tr=null;
   function val(i){return i.value===''?null:+i.value}
   function upd(){var L=isF?val(Li):0,M=val(Mi);
    E.textContent=L==null?'':(L/24).toFixed(2);F.textContent=M==null?'':(M/24).toFixed(2);
-   st.innerHTML='';var ok=L!=null&&M!=null;st.appendChild(el('span',{class:ok?'good':'bad'},ok?'입력완료':'입력 필요'))}
+   st.innerHTML='';var ok=L!=null&&M!=null,past=r.k<TODAY();st.appendChild(el('span',{class:ok?'good':'bad'},ok?'입력완료':(past?'입력 필요':'측정 다음날부터')));if(tr)tr.className=ok?'blu':(past?'yel':'')}
   function commit(){var L=isF?val(Li):0,M=val(Mi);S.fuel[r.id]={date:r.k,outlet:r.o,L:L,M:M};save('fuel',r.id,S.fuel[r.id]);upd()}
   Li.onchange=commit;Mi.onchange=commit;upd();
   var lab=el('td',null,[r.o]);if(isF&&FUELM[r.o])lab.appendChild(el('div',{class:'muted'},FUELM[r.o]));if(isF&&!FUELM[r.o])lab.appendChild(el('div',{class:'muted'},'PIMS 적산값(측정일 00시→다음날 00시 차)'));if(!isF)lab.appendChild(el('div',{class:'muted'},'연료 대상 아님: 일 LNG 0 자동'));
-  t.appendChild(el('tr',null,[el('td',null,(+r.k.slice(5,7))+'/'+(+r.k.slice(8,10))),lab,el('td',null,deptOf(r.o)),el('td',null,r.it.join('·')),el('td',null,kindOf(r.o)),el('td',null,Li),el('td',null,Mi),E,F,el('td',null,'해당없음'),el('td',null,'해당없음'),st]));
+  tr=el('tr',null,[el('td',null,(+r.k.slice(5,7))+'/'+(+r.k.slice(8,10))),lab,el('td',null,deptOf(r.o)),el('td',null,r.it.join('·')),el('td',null,kindOf(r.o)),el('td',null,Li),el('td',null,Mi),E,F,el('td',null,'해당없음'),el('td',null,'해당없음'),st]);t.appendChild(tr);upd();
   tsv.push([r.k,r.o,deptOf(r.o),'','','해당없음','해당없음',kindOf(r.o),isF?(f.L==null?'':f.L):0,f.M==null?'':f.M].join('\t'))});
  if(!rows.length)c.appendChild(el('div',{class:'muted'},'등록된 일정이 없습니다.'));
  c.appendChild(el('div',{class:'scroll'},t));
@@ -327,7 +331,7 @@ async function readPdf(file){
 function mergeSplit(lines){
  /* 표 칸이 위아래로 갈라진 항목: 윗줄에 "값 종료시각 방법"만, 아랫줄에 "항목 기준 시작시각 ~"만 있는 경우를 한 줄로 합친다 */
  var inc=/^\s*([가-힣A-Za-z0-9,\.\(\)\- ]+?)\s+(\d+(?:\.\d+)?)\s*(㎎\/s㎥|ppm|ng\S*)\s+(\d{2}:\d{2})\s*~\s*$/;
- var orp=/^\s*(불검출|\d+(?:\.\d+)?)\s*(?:㎎\/s㎥|ppm|ng\S*)?\s+(\d{2}:\d{2})\s+ES/;
+ var orp=/^\s*(?:[가-힣]\s+)?(불검출|\d+(?:\.\d+)?)\s*(?:㎎\/s㎥|ppm|ng\S*)?\s+(\d{2}:\d{2})\s+ES/;
  var out=[];
  for(var i=0;i<lines.length;i++){var a=lines[i].match(inc),b=i>0?lines[i-1].match(orp):null;
   if(a&&b&&out.length&&out[out.length-1]===lines[i-1]){out.pop();out.push(a[1]+' '+a[2]+' '+a[3]+' '+b[1]+' '+a[4]+' ~ '+b[2])}
