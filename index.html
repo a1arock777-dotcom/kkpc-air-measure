@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>대기측정 관리</title>
+<style>
+:root{--bg:#f7f6f2;--card:#fff;--bd:#d9d6cc;--tx:#1f1e1b;--tx2:#6b6a64;--ac:#185fa5;--acbg:#e6f1fb;--wn:#854f0b;--wnbg:#faeeda;--ok:#3b6d11;--okbg:#eaf3de}
+@media (prefers-color-scheme:dark){:root{--bg:#1e1e1c;--card:#2a2a27;--bd:#444441;--tx:#f1efe8;--tx2:#b4b2a9;--ac:#85b7eb;--acbg:#0c447c;--wn:#fac775;--wnbg:#633806;--ok:#c0dd97;--okbg:#27500a}}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,"Malgun Gothic",sans-serif;background:var(--bg);color:var(--tx);font-size:15px;word-break:keep-all}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--bd);background:var(--card)}
+h1{font-size:17px;margin:0;font-weight:600}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+button,select,input,textarea{font:inherit;color:var(--tx)}
+button{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:6px 12px;cursor:pointer;white-space:nowrap}
+button.on{background:var(--acbg);border-color:var(--ac);color:var(--ac)}
+button.pri{background:var(--ac);color:#fff;border-color:var(--ac)}
+input,select,textarea{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:6px 8px;max-width:100%}
+main{padding:14px;max-width:1100px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:12px}
+.muted{color:var(--tx2);font-size:13px}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal .d{min-height:78px;border:1px solid var(--bd);border-radius:8px;padding:4px;background:var(--card);cursor:pointer;overflow:hidden;font-size:12px}
+.cal .d.sel{outline:2px solid var(--ac)}
+.cal .d.today b{color:var(--ac)}
+.cal .hd{text-align:center;color:var(--tx2);font-size:12px;padding:2px}
+.tag{display:block;margin-top:2px;padding:1px 4px;border-radius:4px;background:var(--acbg);color:var(--ac);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{display:inline-block;margin:2px;padding:4px 10px;border:1px solid var(--bd);border-radius:999px;cursor:pointer;font-size:13px}
+.chip.on{background:var(--acbg);border-color:var(--ac);color:var(--ac)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border-bottom:1px solid var(--bd);padding:5px 4px;text-align:left;vertical-align:middle}
+td input{width:90px}
+.scroll{overflow-x:auto}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.bad{color:var(--wn);background:var(--wnbg);padding:2px 6px;border-radius:4px;font-size:12px}
+.good{color:var(--ok);background:var(--okbg);padding:2px 6px;border-radius:4px;font-size:12px}
+.nt{color:var(--wn);font-size:12px}.ok2{color:var(--tx2);font-size:12px}.tag small{opacity:.8}
+@media (max-width:600px){.cal .d{min-height:56px;font-size:11px}.tag{font-size:10px}}
+</style>
+</head>
+<body>
+<div id="login" style="position:fixed;inset:0;background:var(--bg,#f6f6f4);z-index:50;display:flex;align-items:center;justify-content:center;padding:16px">
+<div class="card" style="width:100%;max-width:340px;margin:0">
+<h1 style="font-size:18px;margin:0 0 4px">대기측정 관리</h1>
+<div class="muted" style="margin-bottom:10px">금호석유화학 울산수지공장 × 미래숲</div>
+<form id="lf" style="display:flex;flex-direction:column;gap:8px">
+<input id="le" type="email" placeholder="이메일" autocomplete="username" required>
+<input id="lp" type="password" placeholder="비밀번호" autocomplete="current-password" required>
+<button class="pri" type="submit">로그인</button>
+<div id="lm" class="muted" style="color:var(--wn)"></div>
+</form></div></div>
+<header>
+<h1>대기측정 관리 <span class="muted">금호석유화학 울산수지공장 × 미래숲</span></h1>
+<nav id="nav"></nav>
+</header>
+<main>
+<div id="status" class="muted" style="margin-bottom:8px"></div>
+<div id="view"></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+var DB=null, S={sched:{},fuel:{},reports:{},log:[]}, tab='sched', ym=new Date(), sel=null, role='금호';
+ym=new Date(2026,10,1);
+var P={year:2026,outlets:{}};
+var CYC=['연1회','반기1회','분기1회','월2회','측정면제'];
+var SHORT={'연1회':'연1','반기1회':'반기','분기1회':'분기','월2회':'월2','측정면제':'면제'};
+function norm(s){s=String(s).replace(/\s+/g,'').trim();var u=s.toUpperCase();
+ if(u==='SOX')return 'SOx';if(u==='NOX')return 'NOx';if(u==='THC'||s==='탄화수소')return 'THC';if(u==='CO')return 'CO';if(s==='스티렌')return '스틸렌';return s}
+function pit(o,n){var O=P.outlets[o];if(!O)return null;for(var i=0;i<O.items.length;i++)if(O.items[i].n===n)return O.items[i];return null}
+function cyc(x,n){return (x.cy&&x.cy[n])||(pit(x.o,n)?pit(x.o,n).c:'')}
+function prange(k,c){var m=+k.slice(5,7);if(c==='연1회')return [1,12];if(c==='반기1회')return m<=6?[1,6]:[7,12];
+ if(c==='분기1회'){var s=Math.floor((m-1)/3)*3+1;return [s,s+2]}if(c==='월2회')return [m,m];return null}
+function noteFor(k,o,n,c){
+ var msg=[];if(!P.outlets[o])return '허가서에 없는 배출구 번호';
+ var it=pit(o,n);if(!it)return '허가서에 없는 항목('+n+')';
+ if(c==='측정면제')return '측정면제 항목입니다';
+ if(it.m)return it.m;
+ var p=prange(k,c);if(!p)return '';var y=+k.slice(0,4);
+ if(y===P.year&&c!=='월2회'){var ms=it.d.filter(function(m){return m>=p[0]&&m<=p[1]});
+  if(ms.length)msg.push(c+' 측정인데 '+ms.join('·')+'월에 이미 측정함')}
+ var ds=[];Object.keys(S.sched).sort().forEach(function(d){if(d===k||d.slice(0,4)!==k.slice(0,4))return;var mm=+d.slice(5,7);if(mm<p[0]||mm>p[1])return;
+  (S.sched[d].items||[]).forEach(function(x){if(x.o===o&&x.it.map(norm).indexOf(n)>=0)ds.push(+d.slice(5,7)+'/'+(+d.slice(8,10)))})});
+ if(ds.length&&!(c==='월2회'&&ds.length<2))msg.push(c+' 측정인데 '+ds.join(', ')+'에도 일정이 등록되어 있음');
+ return msg.join(' / ')}
+function flat(prefix){var a=[];Object.keys(S.sched).sort().forEach(function(k){if(prefix&&k.indexOf(prefix)!==0)return;(S.sched[k].items||[]).forEach(function(x){x.it.forEach(function(n){n=norm(n);var c=cyc(x,n);a.push({k:k,o:x.o,n:n,c:c,note:x.note||''})})})});return a}
+
+var TABS=[['sched','일정'],['fuel','연료사용량'],['rep','성적서'],['q','배출구별 조회']];
+function $(s){return document.querySelector(s)}
+function el(t,a,c){var e=document.createElement(t);if(a)for(var k in a){if(k==='class')e.className=a[k];else if(k.slice(0,2)==='on')e[k]=a[k];else e.setAttribute(k,a[k])}
+ (Array.isArray(c)?c:(c==null?[]:[c])).forEach(function(x){e.appendChild(typeof x==='string'||typeof x==='number'?document.createTextNode(x):x)});return e}
+function pad(n){return (n<10?'0':'')+n}
+function key(y,m,d){return y+'-'+pad(m+1)+'-'+pad(d)}
+function rowsOf(snap){var o=[];var arr=snap&&snap.docs?snap.docs:[];if(!arr.length&&snap&&snap.forEach){snap.forEach(function(d){arr.push(d)})}
+ arr.forEach(function(d){var v=typeof d.data==='function'?d.data():d.data;o.push({id:d.id,v:v||{}})});return o}
+function save(coll,id,obj){try{DB.collection(coll).doc(id).set(obj).catch(function(e){status('저장 실패: '+e.message)})}catch(e){status('저장 실패: '+e.message)}}
+function del(coll,id){try{DB.collection(coll).doc(id).delete().catch(function(e){status('삭제 실패: '+e.message)})}catch(e){}}
+function status(t){$('#status').textContent=t}
+var ME={email:'',role:'',admin:false};
+function init(){
+ render();
+ status('공유 저장소에 연결됨 · '+ME.email);
+ [['schedule','sched'],['fuel','fuel'],['reports','reports']].forEach(function(p){
+  DB.collection(p[0]).onSnapshot(function(snap){var o={};rowsOf(snap).forEach(function(r){o[r.id]=r.v});S[p[1]]=o;safeRender()},function(e){status('읽기 실패('+p[0]+'): '+e.message)})});
+}
+var PEND=false;
+function safeRender(){var a=document.activeElement;if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&$('#view').contains(a)){PEND=true;return}render()}
+document.addEventListener('focusout',function(){if(PEND){PEND=false;setTimeout(function(){var a=document.activeElement;if(!(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)))render()},150)}});
+function render(){
+ var n=$('#nav');n.innerHTML='';
+ TABS.forEach(function(t){n.appendChild(el('button',{class:tab===t[0]?'on':'',onclick:function(){tab=t[0];render()}},t[1]))});
+ if(ME.admin){var r=el('select',{onchange:function(){role=this.value;render()}},['금호','미래숲'].map(function(x){var o=el('option',{value:x},x+' 보기');if(x===role)o.selected=true;return o}));n.appendChild(r)}
+ else n.appendChild(el('span',{class:'muted'},({vendor:'업체(미래숲)',viewer:'조회전용'})[ME.role]||''));
+ n.appendChild(el('button',{onclick:function(){window.FBlogout()}},'로그아웃'));
+ var v=$('#view');v.innerHTML='';
+ ({sched:vSched,fuel:vFuel,rep:vRep,q:vQuery})[tab](v);
+}
+/* 일정 */
+var XPREV=null;
+function vSched(v){
+ var y=ym.getFullYear(),m=ym.getMonth();
+ var head=el('div',{class:'row',style:'justify-content:space-between;margin-bottom:8px'},[
+  el('button',{onclick:function(){ym=new Date(y,m-1,1);render()}},'◀'),
+  el('b',null,y+'년 '+(m+1)+'월'),
+  el('button',{onclick:function(){ym=new Date(y,m+1,1);render()}},'▶')]);
+ var c=el('div',{class:'card'},[head]);
+ var g=el('div',{class:'cal'});
+ ['일','월','화','수','목','금','토'].forEach(function(d){g.appendChild(el('div',{class:'hd'},d))});
+ var first=new Date(y,m,1).getDay(),last=new Date(y,m+1,0).getDate();
+ for(var i=0;i<first;i++)g.appendChild(el('div'));
+ for(var d=1;d<=last;d++){(function(d){
+  var k=key(y,m,d),it=(S.sched[k]&&S.sched[k].items)||[];
+  var cell=el('div',{class:'d'+(sel===k?' sel':''),onclick:function(){sel=k;render()}},[el('b',null,d)]);
+  it.slice(0,3).forEach(function(x){cell.appendChild(el('span',{class:'tag'},x.o+' '+x.it.map(function(n){n=norm(n);var c=cyc(x,n);return n+(c?'('+SHORT[c]+')':'')}).join('·')))});
+  if(it.length>3)cell.appendChild(el('span',{class:'tag'},'+'+(it.length-3)));
+  g.appendChild(cell)})(d)}
+ c.appendChild(g);v.appendChild(c);
+ if(role==='미래숲'){v.appendChild(uploadPanel());if(XPREV)v.appendChild(previewPanel())}
+ if(sel)v.appendChild(dayPanel(sel));
+ v.appendChild(monthTable(y,m));
+ if(role==='미래숲')v.appendChild(importPanel());
+ v.appendChild(logPanel());
+}
+function monthTable(y,m){
+ var c=el('div',{class:'card'},[el('b',null,(m+1)+'월 측정 일정 목록'),el('div',{class:'muted'},'이미 측정했거나 같은 기간에 일정이 또 있으면 비고에 안내됩니다. (등록은 막지 않습니다)')]);
+ var rows=flat(y+'-'+pad(m+1));var t=el('table');
+ t.appendChild(el('tr',null,['날짜','배출구','항목','주기','비고'].map(function(h){return el('th',null,h)})));
+ var WD=['일','월','화','수','목','금','토'];
+ rows.forEach(function(r){var dt=new Date(+r.k.slice(0,4),+r.k.slice(5,7)-1,+r.k.slice(8,10));
+  var nt=noteFor(r.k,r.o,r.n,r.c);
+  t.appendChild(el('tr',null,[el('td',null,(+r.k.slice(5,7))+'/'+(+r.k.slice(8,10))+'('+WD[dt.getDay()]+')'),el('td',null,r.o),el('td',null,r.n),el('td',null,r.c||'-'),el('td',{class:nt?'nt':'ok2'},nt||(r.note||''))]))});
+ if(!rows.length)c.appendChild(el('div',{class:'muted'},'이 달에 등록된 일정이 없습니다.'));
+ c.appendChild(el('div',{class:'scroll'},t));return c}
+function cloneItems(a){return a.map(function(x){return {o:x.o,it:x.it.map(norm),cy:Object.assign({},x.cy||{}),note:x.note||''}})}
+function addTo(list,o,n,c,note){
+ var e=null;list.forEach(function(x){if(x.o===o)e=x});
+ if(!e){e={o:o,it:[],cy:{},note:''};list.push(e)}
+ if(e.it.indexOf(n)<0)e.it.push(n);e.cy[n]=c||'';if(note)e.note=e.note?e.note+' '+note:note;return list}
+function dayPanel(k){
+ var cur=(S.sched[k]&&S.sched[k].items)||[];
+ var c=el('div',{class:'card'},[el('b',null,k+' 측정 일정')]);
+ cur.forEach(function(x,i){x.it.forEach(function(n0,j){var n=norm(n0),cy=cyc(x,n),nt=noteFor(k,x.o,n,cy);
+  var line=el('div',{class:'row',style:'margin:4px 0'},[el('span',{class:'tag',style:'display:inline-block'},x.o+' '+n+(cy?' ('+cy+')':'')),el('span',{class:nt?'nt':'ok2'},nt||'')]);
+  if(role==='미래숲')line.appendChild(el('button',{onclick:function(){var l=cloneItems(cur);var e=l[i];e.it.splice(j,1);delete e.cy[n];if(!e.it.length)l.splice(i,1);putDay(k,l,'삭제 '+x.o+' '+n)}},'삭제'));
+  c.appendChild(line)});
+  if(x.note)c.appendChild(el('div',{class:'muted'},x.o+' 메모: '+x.note))});
+ if(!cur.length)c.appendChild(el('div',{class:'muted'},'등록된 측정이 없습니다.'));
+ if(role==='미래숲'){
+  c.appendChild(el('hr'));
+  c.appendChild(el('b',null,'수기 입력'));
+  var o=el('input',{placeholder:'배출구 예: A-102',size:12,list:'olist'});
+  var dl=el('datalist',{id:'olist'},Object.keys(P.outlets).map(function(k2){return el('option',{value:k2},P.outlets[k2].desc)}));
+  var si=el('select'),sc=el('select'),note=el('input',{placeholder:'메모(선택)',size:14}),pv=el('div',{class:'nt'}),ds=el('div',{class:'muted'});
+  function norO(){return o.value.trim().replace(/^#/,'').toUpperCase().replace(/^A(\d)/,'A-$1')}
+  function fillItems(){var oo=norO(),O=P.outlets[oo];si.innerHTML='';sc.innerHTML='';
+   if(!O){ds.textContent=oo?'허가서에 없는 배출구 번호입니다(그래도 등록은 가능).':'';
+    ['먼지','THC','SOx','NOx','기타'].forEach(function(n){si.appendChild(el('option',{value:n},n))});fillCyc('')}
+   else{ds.textContent=O.desc+(O.memo?' · '+O.memo:'');O.items.forEach(function(it){si.appendChild(el('option',{value:it.n},it.n))});fillCyc(O.items[0].c)}
+   prev()}
+  function fillCyc(def){sc.innerHTML='';CYC.forEach(function(x){var op=el('option',{value:x},x);if(x===def)op.selected=true;sc.appendChild(op)})}
+  function prev(){var oo=norO();if(!oo||!si.value){pv.textContent='';return}pv.textContent=noteFor(k,oo,si.value,sc.value)}
+  o.onchange=fillItems;o.oninput=function(){if(P.outlets[norO()])fillItems()};
+  si.onchange=function(){var it=pit(norO(),si.value);if(it)fillCyc(it.c);prev()};sc.onchange=prev;
+  c.appendChild(el('div',{class:'row',style:'margin-top:6px'},[o,dl,el('span',{class:'muted'},'측정항목'),si,el('span',{class:'muted'},'측정주기'),sc,note]));
+  c.appendChild(ds);c.appendChild(pv);
+  c.appendChild(el('button',{class:'pri',style:'margin-top:6px',onclick:function(){
+   var oo=norO();
+   if(!/^A-\d+$/.test(oo)){status('배출구 번호를 A-숫자 형식으로 입력하세요');return}
+   if(!si.value){status('측정항목을 고르세요');return}
+   putDay(k,addTo(cloneItems(cur),oo,si.value,sc.value,note.value.trim()),'추가 '+oo+' '+si.value)}},'일정 추가'));
+  fillItems();
+ }else c.appendChild(el('div',{class:'muted',style:'margin-top:6px'},'금호 보기는 조회 전용입니다. (미래숲 보기에서 등록)'));
+ return c}
+function putDay(k,items,why,quiet){
+ S.sched[k]={date:k,items:items};
+ if(!items.length){del('schedule',k);delete S.sched[k]}else save('schedule',k,{date:k,items:items});
+ if(!quiet)logIt(k+' '+why);
+ if(!quiet)render()}
+function logIt(w){var e={t:new Date().toISOString().slice(0,16).replace('T',' '),w:w};
+ S.log.unshift(e);save('log',e.t.replace(/\W/g,'')+Math.random().toString(36).slice(2,5),e)}
+/* 줄 단위 해석: 엑셀 칸 글자 / 붙여넣기 공통 */
+function parseCell(text){
+ var list=[],last=null;
+ String(text||'').split(/\r?\n/).forEach(function(ln){
+  var re=/#?\s*A\s*-?\s*(\d+)\s*\(([^)]*)\)/g,x,hit=false;
+  while((x=re.exec(ln))){hit=true;var o='A-'+x[1];
+   x[2].split(/[,·\/、]/).map(norm).filter(Boolean).forEach(function(n){addTo(list,o,n,pit(o,n)?pit(o,n).c:'','')});last=o}
+  if(!hit){var t=ln.trim();if(t&&!/^금호/.test(t)&&last){list.forEach(function(e){if(e.o===last)e.note=e.note?e.note+' '+t:t})}}});
+ return list}
+function cellDay(v){if(v==null||v==='')return null;if(typeof v==='number')return (v>=1&&v<=31&&v%1===0)?v:null;
+ if(v instanceof Date)return v.getDate();if(typeof v==='string'&&/^\d{1,2}$/.test(v.trim())){var n=+v.trim();return n>=1&&n<=31?n:null}return null}
+function parseXlsx(buf,fname){
+ var wb=XLSX.read(buf,{type:'array',cellDates:true}),out=null;
+ wb.SheetNames.forEach(function(sn){if(out)return;
+  var rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null});
+  var y=null,m=null,s=sn+' '+(fname||'');
+  for(var r=0;r<Math.min(rows.length,4)&&!y;r++)(rows[r]||[]).forEach(function(c){if(y||typeof c!=='string')return;var t=c.match(/(\d{4})\s*년\s*(\d{1,2})\s*월/);if(t){y=+t[1];m=+t[2]}});
+  if(!y){var t2=s.match(/(\d{2})\.(\d{1,2})/);if(t2){y=2000+ +t2[1];m=+t2[2]}}
+  if(!y)return;
+  var days={},week=0,total=0;
+  for(var r=0;r<rows.length-1;r++){var row=rows[r]||[],nz=row.filter(function(c){return c!=null&&c!==''});
+   if(!nz.length||!nz.every(function(c){return cellDay(c)!=null}))continue;
+   var txt=rows[r+1]||[];
+   row.forEach(function(c,ci){var d=cellDay(c);if(d==null)return;
+    if(week===0&&d>20)return;if(week>=3&&d<10)return;
+    var list=parseCell(txt[ci]);if(!list.length)return;days[key(y,m-1,d)]=list;total++});
+   week++}
+  if(total)out={sheet:sn,y:y,m:m,days:days,fname:fname}});
+ return out}
+function uploadPanel(){
+ var fi=el('input',{type:'file',accept:'.xlsx,.xls',onchange:function(){var f=this.files[0];if(!f)return;
+  status('엑셀을 읽는 중…');
+  f.arrayBuffer().then(function(b){if(!window.XLSX){status('엑셀 읽기 도구를 불러오지 못했습니다');return}
+   var r=parseXlsx(b,f.name);if(!r){XPREV=null;status('일정 칸을 찾지 못했습니다. 양식이 다른 엑셀일 수 있습니다.');render();return}
+   XPREV=r;ym=new Date(r.y,r.m-1,1);status('읽기 완료: '+Object.keys(r.days).length+'일치 일정 — 아래 미리보기를 확인하고 등록하세요');render()
+  }).catch(function(e){status('읽기 실패: '+e.message)})}});
+ return el('div',{class:'card'},[el('b',null,'엑셀 일정표 올리기'),el('div',{class:'muted'},'기존 "N월 일정" 엑셀(업무계획표)을 올리면 날짜별 배출구·항목이 자동으로 읽힙니다.'),fi])}
+function previewPanel(){
+ var X=XPREV,c=el('div',{class:'card'},[el('b',null,'미리보기 — '+X.y+'년 '+X.m+'월 ('+X.fname+' / '+X.sheet+')')]);
+ var t=el('table');t.appendChild(el('tr',null,['날짜','배출구','항목','주기','비고'].map(function(h){return el('th',null,h)})));
+ Object.keys(X.days).sort().forEach(function(k){X.days[k].forEach(function(x){x.it.forEach(function(n){var cy=cyc(x,n),nt=noteFor(k,x.o,n,cy);
+  t.appendChild(el('tr',null,[el('td',null,(+k.slice(5,7))+'/'+(+k.slice(8,10))),el('td',null,x.o),el('td',null,n),el('td',null,cy||'-'),el('td',{class:nt?'nt':'ok2'},nt||x.note)]))})})});
+ c.appendChild(el('div',{class:'scroll'},t));
+ c.appendChild(el('div',{class:'muted'},'등록하면 위 날짜의 기존 일정은 이 엑셀 내용으로 바뀝니다. 다른 날짜는 그대로입니다.'));
+ c.appendChild(el('div',{class:'row',style:'margin-top:6px'},[
+  el('button',{class:'pri',onclick:function(){var n=0;Object.keys(X.days).forEach(function(k){putDay(k,X.days[k],'',true);n++});logIt(X.y+'-'+pad(X.m)+' 엑셀 업로드 '+n+'일 ('+X.fname+')');XPREV=null;status(n+'일치 일정을 등록했습니다');render()}},'이대로 등록'),
+  el('button',{onclick:function(){XPREV=null;render()}},'취소')]));
+ return c}
+function importPanel(){
+ var ta=el('textarea',{rows:4,style:'width:100%',placeholder:'한 줄에 하나씩\n11/20 #A-102(먼지,THC) #A-106(먼지,THC)\n11/30 #A-104(Sox)'});
+ return el('div',{class:'card'},[el('b',null,'일정 글자로 붙여넣기'),el('div',{class:'muted'},'엑셀 일정 칸의 글자를 그대로 붙여 넣어도 됩니다.'),ta,
+  el('button',{class:'pri',onclick:function(){
+   var cnt=0,y=ym.getFullYear();
+   ta.value.split('\n').forEach(function(ln){
+    var m=ln.match(/(\d{1,2})\s*[\/월.]\s*(\d{1,2})/);if(!m)return;
+    var k=key(y,+m[1]-1,+m[2]),add=parseCell(ln.slice(m[0].length));
+    if(add.length){var l=cloneItems((S.sched[k]&&S.sched[k].items)||[]);add.forEach(function(e){e.it.forEach(function(n){addTo(l,e.o,n,e.cy[n],'');cnt++})});putDay(k,l,'붙여넣기',true)}});
+   logIt('붙여넣기 '+cnt+'건');status(cnt+'건을 불러왔습니다');ta.value='';render()}},'불러오기')])}
+function logPanel(){
+ var c=el('div',{class:'card'},[el('b',null,'변경 이력'),el('div',{class:'muted'},'엑셀 ver.1, ver.2 대신 변경 때마다 자동 기록')]);
+ S.log.slice(0,8).forEach(function(e){c.appendChild(el('div',{class:'muted'},e.t+'  '+e.w))});
+ if(!S.log.length)c.appendChild(el('div',{class:'muted'},'이번 접속에서 변경 기록 없음'));return c}
+/* 연료사용량 */
+var FUELO={'A-109':1,'A-110':1,'A-154':1,'A-155':1,'A-64':1,'A-153':1,'A-66':1,'A-75':1,'A-83':1,'A-80':1,'A-88':1};
+var FUELM={'A-109':'RTO 연료 파일 또는 PIMS 적산차','A-110':'RTO 연료 파일 또는 PIMS 적산차','A-154':'RTO 연료 파일 또는 PIMS 적산차','A-155':'RTO 연료 파일 또는 PIMS 적산차'};
+function deptOf(o){var O=P.outlets[o];if(!O)return '';if(/^(RTO|VCU)/.test(O.desc))return O.desc;var m=O.desc.match(/^[A-Za-z]+/),d=m?m[0]:O.desc.split(' ')[0];return d}
+function kindOf(o){var O=P.outlets[o];if(!O)return '';if(/^(RTO|VCU)/.test(O.desc))return 'ABS,PPG 등';var d=deptOf(o);return d==='COM'?'ABS':d}
+function fuelRows(){var m={};Object.keys(S.sched).sort().forEach(function(k){(S.sched[k].items||[]).forEach(function(x){var id=k+'_'+x.o;
+ if(!m[id])m[id]={id:id,k:k,o:x.o,it:[]};x.it.map(norm).forEach(function(n){if(m[id].it.indexOf(n)<0)m[id].it.push(n)})})});
+ return Object.keys(m).sort().map(function(i){return m[i]})}
+function vFuel(v){
+ var can=role==='금호';
+ if(!can)v.appendChild(el('div',{class:'card',style:'background:var(--wnbg);color:var(--wn)'},[el('b',null,ME.admin?'지금은 "미래숲 보기"라서 입력 칸이 잠겨 있습니다. ':'연료사용량 입력은 금호(관리자)만 가능합니다. '),ME.admin?el('button',{class:'pri',onclick:function(){role='금호';render()}},'금호 보기로 바꾸기'):''
+]));
+ var c=el('div',{class:'card'},[el('b',null,'연료사용량 등 data 요청'),el('div',{class:'muted'},'측정일정이 등록되면 요청 행이 배출구별로 자동 생성됩니다(같은 날 같은 배출구는 한 줄). 입력은 금호만 가능하고 미래숲은 조회·복사만 합니다. 시간당 연료사용량 = 일 LNG ÷ 24, 시간당 제품생산량 = 일 생산량 ÷ 24 로 자동 계산됩니다.'),
+  el('div',{class:'muted'},'일 LNG(㎥)는 RTO·VCU·보일러만 입력하고 나머지 배출구는 0으로 자동 처리됩니다. 일 생산량(톤)은 각 생산공정 일보 값을 입력하세요.')]);
+ var rows=fuelRows();var t=el('table');
+ t.appendChild(el('tr',null,['측정일','배출구','부서','측정항목','종류','일 LNG(㎥)','일 생산량(톤)','시간당 연료사용량(㎥/h)','시간당 제품생산량(톤/h)','소각량','원료투입량','상태'].map(function(h){return el('th',null,h)})));
+ var tsv=[['측정일','배출구','부서','시간당 연료사용량(㎥/h)','시간당 제품생산량(톤/h)','소각량','원료투입량','종류','일 LNG(㎥)','일 생산량(톤)'].join('\t')];
+ rows.forEach(function(r){
+  var f=S.fuel[r.id]||{},isF=!!FUELO[r.o];
+  var Li=el('input',{type:'number',value:isF?(f.L==null?'':f.L):0}),Mi=el('input',{type:'number',value:f.M==null?'':f.M});
+  if(!can||!isF)Li.disabled=true;if(!can)Mi.disabled=true;
+  var E=el('td'),F=el('td'),st=el('td');
+  function val(i){return i.value===''?null:+i.value}
+  function upd(){var L=isF?val(Li):0,M=val(Mi);
+   E.textContent=L==null?'':(L/24).toFixed(2);F.textContent=M==null?'':(M/24).toFixed(2);
+   st.innerHTML='';var ok=L!=null&&M!=null;st.appendChild(el('span',{class:ok?'good':'bad'},ok?'입력완료':'입력 필요'))}
+  function commit(){var L=isF?val(Li):0,M=val(Mi);S.fuel[r.id]={date:r.k,outlet:r.o,L:L,M:M};save('fuel',r.id,S.fuel[r.id]);upd()}
+  Li.onchange=commit;Mi.onchange=commit;upd();
+  var lab=el('td',null,[r.o]);if(isF&&FUELM[r.o])lab.appendChild(el('div',{class:'muted'},FUELM[r.o]));if(isF&&!FUELM[r.o])lab.appendChild(el('div',{class:'muted'},'PIMS 적산값(측정일 00시→다음날 00시 차)'));if(!isF)lab.appendChild(el('div',{class:'muted'},'연료 대상 아님: 일 LNG 0 자동'));
+  t.appendChild(el('tr',null,[el('td',null,(+r.k.slice(5,7))+'/'+(+r.k.slice(8,10))),lab,el('td',null,deptOf(r.o)),el('td',null,r.it.join('·')),el('td',null,kindOf(r.o)),el('td',null,Li),el('td',null,Mi),E,F,el('td',null,'해당없음'),el('td',null,'해당없음'),st]));
+  tsv.push([r.k,r.o,deptOf(r.o),'','','해당없음','해당없음',kindOf(r.o),isF?(f.L==null?'':f.L):0,f.M==null?'':f.M].join('\t'))});
+ if(!rows.length)c.appendChild(el('div',{class:'muted'},'등록된 일정이 없습니다.'));
+ c.appendChild(el('div',{class:'scroll'},t));
+ if(rows.length){var ta=el('textarea',{rows:4,style:'width:100%;display:none'});ta.value=tsv.join('\n');
+  c.appendChild(el('div',{class:'row',style:'margin-top:8px'},[el('button',{onclick:function(){
+   ta.style.display='block';ta.select();var ok=false;try{ok=document.execCommand('copy')}catch(e){}
+   status(ok?'표를 복사했습니다. 엑셀에 붙여넣기 하세요(시간당 값은 복사 시 비어 있으니 엑셀 수식으로 일 값÷24를 넣으세요).':'아래 칸의 글자를 직접 복사하세요')}},'표 복사(엑셀 붙여넣기용)'),ta]));
+ }
+ v.appendChild(c)}
+/* 성적서 */
+var DRAFT=null;
+function vRep(v){
+ var c=el('div',{class:'card'},[el('b',null,'성적서 업로드'),el('div',{class:'muted'},'미래숲 대기측정기록부 PDF를 올리면 글자를 읽어 값을 채웁니다. 확인 후 저장하세요.')]);
+ var fi=el('input',{type:'file',accept:'application/pdf',onchange:function(){if(this.files[0])readPdf(this.files[0])}});
+ c.appendChild(fi);
+ if(DRAFT)c.appendChild(draftView());
+ v.appendChild(c);
+ var l=el('div',{class:'card'},[el('b',null,'저장된 성적서 '+Object.keys(S.reports).length+'건')]);
+ Object.keys(S.reports).sort().forEach(function(k){var r=S.reports[k];l.appendChild(el('div',{class:'muted'},r.date+'  '+r.outlet+'  '+r.issue+'  ('+(r.rows||[]).length+'항목)'))});
+ v.appendChild(l)}
+async function readPdf(file){
+ status('PDF를 읽는 중…');
+ try{
+  if(!window.pdfjsLib){status('PDF 읽기 도구를 불러오지 못했습니다');return}
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  var buf=await file.arrayBuffer();var pdf=await pdfjsLib.getDocument({data:buf}).promise;var lines=[];
+  for(var p=1;p<=pdf.numPages;p++){var pg=await pdf.getPage(p);var tc=await pg.getTextContent();var m={};
+   tc.items.forEach(function(it){var y=Math.round(it.transform[5]/3);(m[y]=m[y]||[]).push({x:it.transform[4],s:it.str})});
+   Object.keys(m).map(Number).sort(function(a,b){return b-a}).forEach(function(y){lines.push(m[y].sort(function(a,b){return a.x-b.x}).map(function(i){return i.s}).join(' ').replace(/\s+/g,' '))})}
+  DRAFT=parseReport(lines,file.name);status('읽기 완료: '+DRAFT.rows.length+'개 항목');
+ }catch(e){status('읽기 실패: '+e.message)}
+ render()}
+function mergeSplit(lines){
+ /* 표 칸이 위아래로 갈라진 항목: 윗줄에 "값 종료시각 방법"만, 아랫줄에 "항목 기준 시작시각 ~"만 있는 경우를 한 줄로 합친다 */
+ var inc=/^\s*([가-힣A-Za-z0-9,\.\(\)\- ]+?)\s+(\d+(?:\.\d+)?)\s*(㎎\/s㎥|ppm|ng\S*)\s+(\d{2}:\d{2})\s*~\s*$/;
+ var orp=/^\s*(불검출|\d+(?:\.\d+)?)\s*(?:㎎\/s㎥|ppm|ng\S*)?\s+(\d{2}:\d{2})\s+ES/;
+ var out=[];
+ for(var i=0;i<lines.length;i++){var a=lines[i].match(inc),b=i>0?lines[i-1].match(orp):null;
+  if(a&&b&&out.length&&out[out.length-1]===lines[i-1]){out.pop();out.push(a[1]+' '+a[2]+' '+a[3]+' '+b[1]+' '+a[4]+' ~ '+b[2])}
+  else out.push(lines[i])}
+ return out}
+function parseReport(lines,fn){
+ lines=mergeSplit(lines);
+ var txt=lines.join('\n'),r={file:fn,rows:[]};
+ var a=txt.match(/발급번호\s*:\s*([A-Z0-9\-]+)/);r.issue=a?a[1]:'';
+ var b=txt.match(/\[\s*(A-\d+)\s*\]/);r.outlet=b?b[1]:(fn.match(/A-\d+/)||[''])[0];
+ var d=txt.match(/채취\s*일\s*:\s*(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);r.date=d?d[1]+'-'+pad(+d[2])+'-'+pad(+d[3]):'';
+ var re=/([가-힣A-Za-z0-9,\.\(\)\- ]+?)\s+(\d+(?:\.\d+)?)\s*(㎎\/s㎥|ppm|ng\S*)\s+(불검출|\d+(?:\.\d+)?)\s*(?:㎎\/s㎥|ppm|ng\S*)?\s+(\d{2}:\d{2})\s*~\s*(\d{2}:\d{2})/;
+ lines.forEach(function(ln){var m=ln.match(re);if(!m)return;
+  var name=m[1].trim().split(' ');while(name.length>1&&name[0].length<=1)name.shift();
+  r.rows.push({item:name.join(' '),limit:+m[2],unit:m[3],value:m[4],time:m[5]+'~'+m[6]})});
+ return r}
+function draftView(){
+ var D=DRAFT,w=el('div',{style:'margin-top:8px'});
+ var iss=el('input',{value:D.issue,size:16,onchange:function(){D.issue=this.value}}),ou=el('input',{value:D.outlet,size:8,onchange:function(){D.outlet=this.value}}),dt=el('input',{type:'date',value:D.date,onchange:function(){D.date=this.value}});
+ w.appendChild(el('div',{class:'row'},[el('span',null,'발급번호'),iss,el('span',null,'배출구'),ou,el('span',null,'채취일'),dt]));
+ var t=el('table');t.appendChild(el('tr',null,['항목','허용기준','측정값','단위','측정시간'].map(function(h){return el('th',null,h)})));
+ D.rows.forEach(function(r){t.appendChild(el('tr',null,[r.item,r.limit,r.value,r.unit,r.time].map(function(x){return el('td',null,String(x))})))});
+ w.appendChild(el('div',{class:'scroll',style:'margin:8px 0'},t));
+ if(!D.rows.length)w.appendChild(el('div',{class:'bad'},'측정 항목을 읽지 못했습니다. 양식이 다른 PDF일 수 있습니다.'));
+ w.appendChild(el('button',{class:'pri',onclick:function(){
+  if(!D.outlet||!D.date){status('배출구와 채취일을 확인하세요');return}
+  var id=(D.date+'_'+D.outlet+'_'+(D.issue||D.file)).replace(/[^\w\-가-힣]/g,'');
+  var o={date:D.date,outlet:D.outlet,issue:D.issue,rows:D.rows,file:D.file};S.reports[id]=o;save('reports',id,o);DRAFT=null;status('저장했습니다');render()}},'확인 후 저장'));
+ return w}
+/* 조회 */
+var QO='',QI='';
+function vQuery(v){
+ var outs={},items={};Object.keys(S.reports).forEach(function(k){var r=S.reports[k];outs[r.outlet]=1;(r.rows||[]).forEach(function(x){items[x.item]=1})});
+ var os=Object.keys(outs).sort(),is=Object.keys(items).sort();
+ if(!QO&&os.length)QO=os[0];
+ var so=el('select',{onchange:function(){QO=this.value;render()}},os.map(function(x){var o=el('option',{value:x},x);if(x===QO)o.selected=true;return o}));
+ var si=el('select',{onchange:function(){QI=this.value;render()}},[el('option',{value:''},'전체 항목')].concat(is.map(function(x){var o=el('option',{value:x},x);if(x===QI)o.selected=true;return o})));
+ var c=el('div',{class:'card'},[el('b',null,'배출구별 측정값 조회'),el('div',{class:'row',style:'margin:8px 0'},[so,si])]);
+ var t=el('table');t.appendChild(el('tr',null,['채취일','항목','측정값','허용기준','단위'].map(function(h){return el('th',null,h)})));
+ var n=0;Object.keys(S.reports).map(function(k){return S.reports[k]}).filter(function(r){return r.outlet===QO}).sort(function(a,b){return a.date<b.date?1:-1}).forEach(function(r){
+  (r.rows||[]).filter(function(x){return !QI||x.item===QI}).forEach(function(x){n++;t.appendChild(el('tr',null,[r.date,x.item,x.value,x.limit,x.unit].map(function(z){return el('td',null,String(z))})))})});
+ c.appendChild(el('div',{class:'scroll'},t));
+ if(!n)c.appendChild(el('div',{class:'muted'},'저장된 성적서가 없습니다. 성적서 탭에서 PDF를 올려 보세요.'));
+ v.appendChild(c)}
+</script>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+import {initializeFirestore,collection,doc,setDoc,deleteDoc,getDoc,onSnapshot} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+var app=initializeApp({apiKey:"AIzaSyC2rXMuufImZCZq6N89GwTlPg_Xgse4jEU",authDomain:"kkpc-air-measure.firebaseapp.com",projectId:"kkpc-air-measure",storageBucket:"kkpc-air-measure.firebasestorage.app",messagingSenderId:"346985691005",appId:"1:346985691005:web:c4401fbf0611ecd7e57e14"});
+var auth=getAuth(app),fs=initializeFirestore(app,{ignoreUndefinedProperties:true});
+window.DB={collection:function(c){return{doc:function(id){return{set:function(o){return setDoc(doc(fs,c,id),o)},delete:function(){return deleteDoc(doc(fs,c,id))}}},onSnapshot:function(cb,eb){return onSnapshot(collection(fs,c),cb,eb)}}}};
+window.FBlogout=function(){signOut(auth).then(function(){location.reload()})};
+var L=function(id){return document.getElementById(id)};
+function msg(t){L('lm').textContent=t||''}
+L('lf').addEventListener('submit',function(e){e.preventDefault();msg('로그인 중...');
+ signInWithEmailAndPassword(auth,L('le').value.trim(),L('lp').value).catch(function(){msg('이메일 또는 비밀번호가 맞지 않습니다.')})});
+var started=false;
+onAuthStateChanged(auth,async function(u){
+ if(!u){L('login').style.display='flex';return}
+ var email=(u.email||'').toLowerCase();
+ try{
+  var r=await getDoc(doc(fs,'users',email));
+  if(!r.exists()||['admin','vendor','viewer'].indexOf(r.data().role)<0){msg('이 계정은 아직 사용 권한이 없습니다. 금호 담당자에게 문의하세요.');await signOut(auth);return}
+  ME.email=email;ME.role=r.data().role;ME.admin=ME.role==='admin';
+  role=ME.admin?'금호':(ME.role==='vendor'?'미래숲':'조회');
+  var p=await getDoc(doc(fs,'config','permit'));
+  if(p.exists())P=JSON.parse(p.data().json);
+  L('login').style.display='none';
+  if(started)return;started=true;
+  if(!p.exists()){
+   if(ME.admin){var box=document.createElement('div');box.className='card';box.innerHTML='<b>허가서 데이터가 아직 없습니다.</b><div class="muted">관리자만 한 번 올리면 됩니다. permit.json 파일을 선택하세요.</div>';
+    var f=document.createElement('input');f.type='file';f.accept='.json';f.onchange=async function(){try{var t=await f.files[0].text();JSON.parse(t);await setDoc(doc(fs,'config','permit'),{json:t});location.reload()}catch(e){alert('올리기 실패: '+e.message)}};
+    box.appendChild(f);document.querySelector('main').prepend(box)}
+   else status('허가서 데이터가 아직 올라오지 않았습니다. 관리자에게 문의하세요.')}
+  init();
+ }catch(e){msg('로그인 후 확인 실패: '+e.message)}
+});
+</script>
+</body>
+</html>
