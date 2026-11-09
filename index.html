@@ -334,7 +334,7 @@ function vRep(v){
  var l=el('div',{class:'card'},[el('b',null,'저장된 성적서 '+Object.keys(S.reports).length+'건')]);
  Object.keys(S.reports).sort().forEach(function(k){var r=S.reports[k];l.appendChild(el('div',{class:'muted'},r.date+'  '+r.outlet+'  '+r.issue+'  ('+(r.rows||[]).length+'항목)'+(r.purpose==='참고'?' (참고용)':'')))});
  v.appendChild(l)}
-var RY=null;
+var RY=null,RFM=0,RFK='all';
 function outKey(o){var m=/^A-(\d+)$/.exec(o);return m?[0,+m[1],o]:[1,0,o]}
 function repMatrix(){
  var ks=Object.keys(S.reports),yrs={},data={};
@@ -346,8 +346,12 @@ function repMatrix(){
  if(!RY||!yrs[RY])RY=ylist[ylist.length-1];
  var c=el('div',{class:'card'},[el('b',null,'배출구별 성적서 현황 (측정일)')]);
  var sel=el('select',{onchange:function(){RY=this.value;render()}},ylist.map(function(y){var o=el('option',{value:y},y+'년');if(y===RY)o.selected=true;return o}));
- c.appendChild(el('div',{class:'row',style:'margin:6px 0'},[sel,el('span',{class:'muted'},'칸 안의 숫자는 측정일(일). *는 참고용 측정. 비어 있으면 그 달 성적서 없음')]));
+ var fm=el('select',{onchange:function(){RFM=+this.value;render()}},[el('option',{value:0},'전체 월')].concat([1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){var o=el('option',{value:m},m+'월');if(m===RFM)o.selected=true;return o})));
+ var fk=el('select',{onchange:function(){RFK=this.value;render()}},[['all','전체 보기'],['has','측정한 배출구만'],['empty','빈칸(미측정)만']].map(function(x){var o=el('option',{value:x[0]},x[1]);if(x[0]===RFK)o.selected=true;return o}));
+ c.appendChild(el('div',{class:'row',style:'margin:6px 0'},[sel,fm,fk,el('span',{class:'muted'},'칸 안의 숫자는 측정일(일). *는 참고용 측정. 비어 있으면 그 달 성적서 없음 · 월을 고르면 그 달, 전체 월이면 연중 한 번이라도 측정했는지 기준')]));
  var oy=data[RY]||{};var outs=Object.keys(oy).sort(function(a,b){var x=outKey(a),y=outKey(b);return x[0]-y[0]||x[1]-y[1]||(x[2]<y[2]?-1:x[2]>y[2]?1:0)});
+ var allOuts=outs.length;
+ if(RFK!=='all')outs=outs.filter(function(o){var h=RFM?((oy[o][RFM]||[]).length>0):Object.keys(oy[o]).some(function(m){return (oy[o][m]||[]).length>0});return RFK==='has'?h:!h});
  var t=el('table',{class:'grid'});var hs=['배출구'];for(var m=1;m<=12;m++)hs.push(m+'월');hs.push('합계');
  t.appendChild(el('tr',null,hs.map(function(h){return el('th',{style:'white-space:nowrap;word-break:keep-all'},h)})));
  var tot=0;
@@ -355,7 +359,7 @@ function repMatrix(){
   for(var m=1;m<=12;m++){var a=(oy[o][m]||[]).slice().sort(function(a,b){return parseInt(a)-parseInt(b)});n+=a.length;cells.push(el('td',{style:'font-size:12px;min-width:48px'},a.join(', ')))}
   tot+=n;cells.push(el('td',{style:'white-space:nowrap'},n+'건'));t.appendChild(el('tr',null,cells))});
  c.appendChild(el('div',{class:'vs'},t));
- c.appendChild(el('div',{class:'muted',style:'margin-top:6px'},RY+'년 배출구 '+outs.length+'곳, 측정일 표기 '+tot+'건(같은 날 참고용이 함께 있으면 따로 셉니다)'));
+ c.appendChild(el('div',{class:'muted',style:'margin-top:6px'},RY+'년 배출구 '+outs.length+'곳'+(RFK!=='all'?'(전체 '+allOuts+'곳 중 '+(RFM?RFM+'월 ':'')+(RFK==='has'?'측정한 곳':'미측정 곳')+')':'')+', 측정일 표기 '+tot+'건(같은 날 참고용이 함께 있으면 따로 셉니다)'));
  return c}
 async function readPdf(file){
  status('PDF를 읽는 중…');
