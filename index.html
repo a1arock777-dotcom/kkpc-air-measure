@@ -85,7 +85,7 @@ function cyc(x,n){return (x.cy&&x.cy[n])||(pit(x.o,n)?pit(x.o,n).c:'')}
 function prange(k,c){var m=+k.slice(5,7);if(c==='연1회')return [1,12];if(c==='반기1회')return m<=6?[1,6]:[7,12];
  if(c==='분기1회'){var s=Math.floor((m-1)/3)*3+1;return [s,s+2]}if(c==='월2회')return [m,m];return null}
 function rn(s){s=String(s).replace(/\(참고용\)/g,'').replace(/\s+/g,'');var u=s.toUpperCase();
- if(/THC|탄화수소/.test(u))return 'THC';if(u==='SOX'||s==='황산화물')return 'SOx';if(u==='NOX'||s==='질소산화물')return 'NOx';if(u==='CO'||s==='일산화탄소')return 'CO';if(s==='스티렌')return '스틸렌';return s}
+ if(/벤조|다환/.test(s))return '벤조피렌';if(/THC|탄화수소/.test(u))return 'THC';if(u==='SOX'||s==='황산화물')return 'SOx';if(u==='NOX'||s==='질소산화물')return 'NOx';if(u==='CO'||s==='일산화탄소')return 'CO';if(s==='스티렌')return '스틸렌';return s}
 var DONE=null,DONEN=-1;
 function doneSet(){var n=Object.keys(S.reports).length;if(DONE&&DONEN===n)return DONE;DONE={};DONEN=n;
  Object.keys(S.reports).forEach(function(k){var r=S.reports[k];if(!r||!r.date)return;(r.rows||[]).forEach(function(x){DONE[r.date+'|'+r.outlet+'|'+rn(x.item)]=1})});return DONE}
@@ -418,7 +418,7 @@ var ABT={};
  '113 - x,118 - x,119 - x,120 - x,123 BF-02,03 f,125 BF-506A f,126 BF-505C f,127 BF-505DC f,128 BF-505DA f,129 BF-505DB f,139 - x,140 - x,141 BF-07 f,142 BF-06 f,143 BF-400 f,144 BF-300 f,145 BF-500 f,'+
  '146 T-10A/B x,147 7T-EPP x,148 9AW-01/02 x,149 13BF-611 x,150 11AW-01/02 x,151 10HL-504 x,152 BF-T8 x,153 LNB-S2 l,154 RTO-4 d,155 VCU d,156 N-X-200 b,159 BF-507 f,160 BF-508 f,161 D-01 x,162 DC-02 f,163 13HL-304 x,164 1W-2501/2 x').split(',').forEach(function(s){var p=s.split(' ');ABT['A-'+p[0]]=(p[1]==='-'?'':p[1]+' ')+'('+ABK[p[2]]+')'});
 function rk(s){s=rn(s);if(/^크롬/.test(s))return '크롬';if(/^비소/.test(s))return '비소';if(/^니켈/.test(s))return '니켈';if(/^페놀/.test(s))return '페놀';if(/벤조|다환/.test(s))return '벤조피렌';if(/^불소/.test(s))return '불소';
- if(/프로필렌옥사이드|산화프로플렌|^PO$/.test(s))return 'PO';if(/에틸렌옥사이드|산화에틸렌|^EO$/.test(s))return 'EO';return s}
+ if(/프로필렌옥사이드|산화프로플렌|산화프로필렌|^PO$/.test(s))return 'PO';if(/에틸렌옥사이드|산화에틸렌|^EO$/.test(s))return 'EO';return s}
 var RMALL=false,RMQ='';
 function outNo(k){return +String(k).replace(/\D/g,'')}
 function rmNorm(x){return String(x).toLowerCase().replace(/[\s\-_]/g,'')}
